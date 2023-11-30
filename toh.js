@@ -44,16 +44,12 @@ function initToH(full) {
 		var parse = new DOMParser();
 		var html = parse.parseFromString(toh_table, 'text/html');
 
-		document.querySelectorAll(full ? 'div.wrap_toh_full' : 'div.wrap_toh').forEach(function(wrapper) {
+		document.querySelectorAll(full ? 'div.wrap_toh_full' : 'div.wrap_toh').forEach(function(wrapper, toh_id) {
 			$(wrapper).empty().append(html.querySelector('#devices').cloneNode(true));
 
 			var table = $(wrapper).children('table');
 
-			// Setup - add a text input to each footer cell
-			$(wrapper).find('thead tr')
-				.clone(true)
-				.addClass('filters')
-				.appendTo(table.children('thead'));
+			table.attr('id', `toh_${full ? 'full' : 'min'}_${toh_id}`);
 
 			// Obtain filter presets
 			var filterValues = [];
@@ -85,6 +81,12 @@ function initToH(full) {
 					}
 				});
 			});
+
+			// Setup - add a text input to each footer cell
+			$(wrapper).find('thead tr')
+				.clone(true)
+				.addClass('filters')
+				.appendTo(table.children('thead'));
 
 			// Init datatable
 			var unorderable = [];
