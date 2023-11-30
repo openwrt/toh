@@ -1,3 +1,5 @@
+(function($) {
+
 function loadStyle(url) {
 	return new Promise(function(acceptFn, rejectFn) {
 		var link = document.createElement('link');
@@ -189,3 +191,5 @@ if (document.querySelector('div.wrap_toh'))
 
 if (document.querySelector('div.wrap_toh_full'))
 	initToH(true);
+
+})(jQuery);
