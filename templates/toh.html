@@ -16,7 +16,7 @@
     <tr>
         <td>{{ device.brand }}</td>
         <td>{{ device.model }}</td>
-        <td>{% if device.versions %}{{ device.versions }}{% endif %}</td>
+        <td>{% if device.version %}{{ device.version }}{% endif %}</td>
         <td>{% if device.supportedcurrentrel %}{{ device.supportedcurrentrel }}{% endif %}</td>
         <td>{% if device.devicepage %}<a href="https://openwrt.org/{{ device.devicepage | replace(from=':', to='/') | safe}}">Device Page</a>{% else %}-{% endif %}</td>
         <td><a href="https://openwrt.org/{{ device.page | replace(from=':', to='/') | safe}}">Edit</a></td>
