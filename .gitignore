@@ -1,0 +1,6 @@
+.DS_Store
+.vscode/
+public/
+content/devices/*
+!content/devices/_index.md
+static/devices/*

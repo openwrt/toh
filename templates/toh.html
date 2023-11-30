@@ -1,0 +1,26 @@
+{% set section = get_section(path="devices/_index.md") %}
+<table id="devices" class="table table-striped table-sm" style="width:100%">
+    <thead>
+        <tr>
+            <th class="toh_brand">Brand</th>
+            <th class="toh_model">Model</th>
+            <th class="toh_version">Version</th>
+            <th class="toh_supported_current_rel">Supported Current Release</th>
+            <th class="toh_page">Device Page</th>
+            <th class="toh_edit"></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for page in section.pages %}
+    {% set device = load_data(path="static/devices/" ~ page.extra.device_id ~ ".json", format="json") %}
+    <tr>
+        <td>{{ device.brand }}</td>
+        <td>{{ device.model }}</td>
+        <td>{% if device.versions %}{{ device.versions }}{% endif %}</td>
+        <td>{% if device.supportedcurrentrel %}{{ device.supportedcurrentrel }}{% endif %}</td>
+        <td>{% if device.devicepage %}<a href="https://openwrt.org/{{ device.devicepage | replace(from=':', to='/') | safe}}">Device Page</a>{% else %}-{% endif %}</td>
+        <td><a href="https://openwrt.org/{{ device.page | replace(from=':', to='/') | safe}}">Edit</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>

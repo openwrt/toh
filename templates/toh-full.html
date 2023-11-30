@@ -1,0 +1,54 @@
+{% set section = get_section(path="devices/_index.md") %}
+<table id="devices" class="table table-striped table-sm" style="width:100%">
+    <thead>
+        <tr>
+            <th class="toh_devicetype">Device Type</th>
+            <th class="toh_brand">Brand</th>
+            <th class="toh_model">Model</th>
+            <th class="toh_version">Version</th>
+            <th class="toh_availability">Availability</th>
+            <th class="tph_supportedcurrentrel">Supported Current Release</th>
+            <th class="toh_unsupported_functions">Unsupported Functions</th>
+            <th class="toh_cpu">CPU</th>
+            <th class="toh_cpumhz">CPU MHz</th>
+            <th class="toh_cpucores">CPU cores</th>
+            <th class="toh_flashmb">Flash</th>
+            <th class="toh_rammb">RAM</th>
+            <th class="toh_ethernet100mports">100M ports</th>
+            <th class="toh_ethernetgbitports">1G ports</th>
+            <th class="toh_wlanhardware">WiFi hardware</th>
+            <th class="toh_wlan24ghz">WiFi 2.4GHz</th>
+            <th class="toh_wlan50ghz">WiFi 5GHz</th>
+            <th class="toh_usbports">USB ports</th>
+            <th class="toh_devicepage">Device Page</th>
+            <th class="toh_page"></th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for page in section.pages %}
+    {% set device = load_data(path="static/devices/" ~ page.extra.device_id ~ ".json", format="json") %}
+    <tr>
+        <td>{{ device.devicetype }}</td>
+        <td>{{ device.brand }}</td>
+        <td>{{ device.model }}</td>
+        <td>{% if device.versions %}{{ device.versions }}{% endif %}</td>
+        <td>{% if device.availability %}{{ device.availability }}{% endif %}</td>
+        <td>{% if device.supportedcurrentrel %}{{ device.supportedcurrentrel }}{% endif %}</td>
+        <td>{% if device.unsupported_functions %}{{ device.unsupported_functions }}{% endif %}</td>
+        <td>{{ device.cpu }}</td>
+        <td>{{ device.cpumhz }}</td>
+        <td>{{ device.cpucores }}</td>
+        <td>{{ device.flashmb }}</td>
+        <td>{{ device.rammb }}</td>
+        <td>{{ device.ethernet100mports }}</td>
+        <td>{{ device.ethernetgbitports }}</td>
+        <td>{% if device.wlanhardware %}{{ device.wlanhardware }}{% endif %}</td>
+        <td>{{ device.wlan24ghz }}</td>
+        <td>{{ device.wlan50ghz }}</td>
+        <td>{{ device.usbports }}</td>
+        <td>{% if device.devicepage %}<a href="https://openwrt.org/{{ device.devicepage | replace(from=':', to='/') | safe}}">Device Page</a>{% else %}-{% endif %}</td>
+        <td><a href="https://openwrt.org/{{ device.page | replace(from=':', to='/') | safe}}">Edit</a></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
