@@ -1,10 +1,15 @@
 # On every push this script is executed
-on: push
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 8 * * *'
+
 name: Build and deploy GH Pages
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     steps:
       - name: checkout
         uses: actions/checkout@v4
