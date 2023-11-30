@@ -47,11 +47,13 @@ function initToH(full) {
 		document.querySelectorAll(full ? 'div.wrap_toh_full' : 'div.wrap_toh').forEach(function(wrapper) {
 			$(wrapper).empty().append(html.querySelector('#devices').cloneNode(true));
 
+			var table = $(wrapper).children('table');
+
 			// Setup - add a text input to each footer cell
 			$(wrapper).find('thead tr')
 				.clone(true)
 				.addClass('filters')
-				.appendTo('#devices thead');
+				.appendTo(table.children('thead'));
 
 			// Obtain filter presets
 			var filterValues = [];
@@ -85,7 +87,6 @@ function initToH(full) {
 			});
 
 			// Init datatable
-			var table = $(wrapper).children('table');
 			var unorderable = [];
 			var ordering = [];
 
@@ -120,7 +121,7 @@ function initToH(full) {
 				}
 			});
 
-			$(wrapper).children('table').DataTable({
+			table.DataTable({
 				pageLength: 50,
 				orderCellsTop: true,
 				fixedHeader: true,
@@ -148,36 +149,25 @@ function initToH(full) {
 								column.search(filterValues[colIdx], true, false).draw();
 
 							// On every keypress in this input
-							$(
-								'input',
-								$('.filters th').eq($(column.header()).index())
-							)
+							var th = table.find('.filters th').eq(colIdx);
+							$(th.children('input'), th)
 								.off('keyup change')
-								.on('change', function (e) {
+								.on('keyup change', function (e) {
+									e.stopPropagation();
 									// Get the search value
 									$(this).attr('title', $(this).val());
 									var regexr = '({search})'; //$(this).parents('th').find('select').val();
-
 									var cursorPosition = this.selectionStart;
 									// Search the column for that value
 									api
 										.column(colIdx)
 										.search(
-											this.value != ''
-												? regexr.replace('{search}', '(((' + this.value + ')))')
-												: '',
-											this.value != '',
-											this.value == ''
-										)
+											(this.value != "") ? regexr.replace('{search}', '((('+this.value+')))') : "",
+											this.value != "",
+											this.value == "")
 										.draw();
-								})
-								.on('keyup', function (e) {
-									e.stopPropagation();
 
-									$(this).trigger('change');
-									$(this)
-										.focus()[0]
-										.setSelectionRange(cursorPosition, cursorPosition);
+									$(this).focus()[0].setSelectionRange(cursorPosition, cursorPosition);
 								});
 						});
 				},
