@@ -186,10 +186,8 @@ function initToH(full) {
 	});
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-	if (document.querySelector('div.wrap_toh'))
-		initToH(false);
+if (document.querySelector('div.wrap_toh'))
+	initToH(false);
 
-	if (document.querySelector('div.wrap_toh_full'))
-		initToH(true);
-});
+if (document.querySelector('div.wrap_toh_full'))
+	initToH(true);
