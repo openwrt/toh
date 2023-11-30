@@ -32,11 +32,9 @@ const TOH_DATA_FULL_URL = 'https://openwrt.github.io/toh/toh-full/index.html';
 function initToH(full) {
 	Promise.all([
 		loadStyle('https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css'),
+		loadScript('https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js'),
 		loadStyle('https://cdn.datatables.net/searchpanes/2.2.0/css/searchPanes.dataTables.min.css'),
-		loadScript('https://code.jquery.com/jquery-3.7.0.js')
 	]).then(function() {
-		return loadScript('https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js');
-	}).then(function() {
 		return fetch(full ? TOH_DATA_FULL_URL : TOH_DATA_MIN_URL);
 	}).then(function(toh_reply) {
 		return toh_reply.text();
