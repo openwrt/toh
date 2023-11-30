@@ -31,6 +31,16 @@ function loadScript(url) {
 const TOH_DATA_MIN_URL = 'https://openwrt.github.io/toh/toh/index.html';
 const TOH_DATA_FULL_URL = 'https://openwrt.github.io/toh/toh-full/index.html';
 
+const toh_profiles = {
+	supported_devices: {
+		dom: 'frt',
+		paging: false,
+		filterColumns: {
+			supported_current_release: 'snapshot|[0-9]+'
+		}
+	}
+};
+
 function initToH(full) {
 	Promise.all([
 		loadStyle('https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css'),
@@ -50,12 +60,24 @@ function initToH(full) {
 			var table = $(wrapper).children('table');
 
 			table.attr('id', `toh_${full ? 'full' : 'min'}_${toh_id}`);
+			table.find('a[href^="https://openwrt.org/toh/"]').each((i, a) => {
+				var m = a.href.match(/^https:\/\/openwrt\.org\/toh\/([^\/]+)\/([^\/]+)$/);
+				if (m)
+					$(a).replaceWith(`<a href="/toh/${m[1]}/${m[2]}" class="wikilink1" title="toh:${m[1]}:${m[2]}">${m[2]}</a>`)
+			});
 
 			// Obtain filter presets
 			var filterValues = [];
 			var hiddenColumns = {};
 			var shownColumns = {};
 			var selectedColumnsOnly = false;
+			var pageLength = 50;
+			var profile;
+
+			Object.keys(toh_profiles).forEach(profileName => {
+				if (wrapper.classList.contains(`wrap_toh_profile_${profileName}`))
+					profile = toh_profiles[profileName];
+			});
 
 			$(wrapper).find('thead tr th').each(function(i, th) {
 				var key = th.innerText.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, '_');
@@ -80,6 +102,12 @@ function initToH(full) {
 						selectedColumnsOnly = true;
 					}
 				});
+
+				if (profile?.filterColumns?.[key])
+					filterValues[i] = profile?.filterColumns[key];
+
+				if (profile?.hiddenColumns?.includes(key))
+					hiddenColumns[i] = true;
 			});
 
 			// Setup - add a text input to each footer cell
@@ -112,9 +140,14 @@ function initToH(full) {
 					return;
 
 				// Disable sort and filter input for fixed columns
-				if (title == 'OEM Device Homepage' || title == 'Device Page' || title == '' || filterValues[colIdx] != null) {
+				if (th.classList.contains('toh_edit') || th.classList.contains('toh_page')) {
 					$(th).html('&nbsp;');
 					unorderable.push(colIdx);
+				}
+				// Disable filter input for filtered columns
+				else if (th.classList.contains('toh_devicepage') || filterValues[colIdx] != null) {
+					$(th).html('&nbsp;');
+					ordering.push([ colIdx, 'asc' ]);
 				}
 				// User filters for remaining columns
 				else {
@@ -124,7 +157,9 @@ function initToH(full) {
 			});
 
 			table.DataTable({
-				pageLength: 50,
+				dom: profile?.dom ?? 'lfrtip',
+				paging: profile?.paging ?? true,
+				pageLength: profile?.pageLength ?? 50,
 				orderCellsTop: true,
 				fixedHeader: true,
 				order: ordering,
