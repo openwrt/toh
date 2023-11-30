@@ -1,125 +1,195 @@
 function loadStyle(url) {
-  return new Promise(function (acceptFn, rejectFn) {
-    var link = document.createElement("link");
-    link.onload = acceptFn;
-    link.onerror = rejectFn;
-    document.querySelector("head").appendChild(link);
-    link.rel = "stylesheet";
-    link.href = url;
-  });
+	return new Promise(function(acceptFn, rejectFn) {
+		var link = document.createElement('link');
+
+		link.onload = acceptFn;
+		link.onerror = rejectFn;
+
+		document.querySelector('head').appendChild(link);
+
+		link.rel = 'stylesheet';
+		link.href = url;
+	});
 }
+
 function loadScript(url) {
-  return new Promise(function (acceptFn, rejectFn) {
-    var script = document.createElement("script");
-    script.onload = acceptFn;
-    script.onerror = rejectFn;
-    document.querySelector("head").appendChild(script);
-    script.src = url;
-  });
+	return new Promise(function(acceptFn, rejectFn) {
+		var script = document.createElement('script');
+
+		script.onload = acceptFn;
+		script.onerror = rejectFn;
+
+		document.querySelector('head').appendChild(script);
+
+		script.src = url;
+	});
 }
-const TOH_BASE_URL = "https://openwrt.github.io/toh/toh/";
-function initToH() {
-  Promise.all([
-    loadStyle("https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css"),
-    loadStyle(
-      "https://cdn.datatables.net/searchpanes/2.2.0/css/searchPanes.dataTables.min.css"
-    ),
-    loadScript("https://code.jquery.com/jquery-3.7.0.js"),
-  ])
-    .then(function () {
-      return loadScript(
-        "https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"
-      );
-    })
-    .then(function () {
-      return Promise.all([
-        fetch(TOH_BASE_URL),
-        loadScript(
-          "https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"
-        ),
-      ]);
-    })
-    .then(function (promises) {
-      return promises[0].text();
-    })
-    .then(function (toh_table) {
-      var parse = new DOMParser();
-      var html = parse.parseFromString(toh_table, "text/html");
-      document.querySelectorAll("div.wrap_toh").forEach(function (wrapper) {
-        $(wrapper)
-          .empty()
-          .append(html.querySelector("#devices").cloneNode(true));
-        // Setup - add a text input to each footer cell
-        $(wrapper)
-          .find("thead tr")
-          .clone(true)
-          .addClass("filters")
-          .appendTo("#devices thead");
-        // Init datatable
-        var table = $(wrapper)
-          .children("table")
-          .DataTable({
-            pageLength: 50,
-            orderCellsTop: true,
-            fixedHeader: true,
-            initComplete: function () {
-              var api = this.api();
-              // For each column
-              api
-                .columns()
-                .eq(0)
-                .each(function (colIdx) {
-                  // Set the header cell to contain the input element
-                  var cell = $(".filters th").eq(
-                    $(api.column(colIdx).header()).index()
-                  );
-                  var title = $(cell).text();
-                  $(cell).html(
-                    '<input type="text" placeholder="' + title + '" />'
-                  );
-                  // On every keypress in this input
-                  $(
-                    "input",
-                    $(".filters th").eq($(api.column(colIdx).header()).index())
-                  )
-                    .off("keyup change")
-                    .on("change", function (e) {
-                      // Get the search value
-                      $(this).attr("title", $(this).val());
-                      var regexr = "({search})"; //$(this).parents('th').find('select').val();
-                      var cursorPosition = this.selectionStart;
-                      // Search the column for that value
-                      api
-                        .column(colIdx)
-                        .search(
-                          this.value != ""
-                            ? regexr.replace(
-                                "{search}",
-                                "(((" + this.value + ")))"
-                              )
-                            : "",
-                          this.value != "",
-                          this.value == ""
-                        )
-                        .draw();
-                    })
-                    .on("keyup", function (e) {
-                      e.stopPropagation();
-                      $(this).trigger("change");
-                      $(this)
-                        .focus()[0]
-                        .setSelectionRange(cursorPosition, cursorPosition);
-                    });
-                });
-            },
-          });
-        wrapper.classList.forEach(function (className) {
-          var m = className.match(/^wrap_toh_brand_(.+)$/);
-          if (m) table.column(0).search(m[1]).draw();
-        });
-      });
-    });
+
+
+const TOH_DATA_MIN_URL = 'https://openwrt.github.io/toh/toh/index.html';
+const TOH_DATA_FULL_URL = 'https://openwrt.github.io/toh/toh-full/index.html';
+
+function initToH(full) {
+	Promise.all([
+		loadStyle('https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css'),
+		loadStyle('https://cdn.datatables.net/searchpanes/2.2.0/css/searchPanes.dataTables.min.css'),
+		loadScript('https://code.jquery.com/jquery-3.7.0.js')
+	]).then(function() {
+		return loadScript('https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js');
+	}).then(function() {
+		return fetch(full ? TOH_DATA_FULL_URL : TOH_DATA_MIN_URL);
+	}).then(function(toh_reply) {
+		return toh_reply.text();
+	}).then(function(toh_table) {
+		var parse = new DOMParser();
+		var html = parse.parseFromString(toh_table, 'text/html');
+
+		document.querySelectorAll(full ? 'div.wrap_toh_full' : 'div.wrap_toh').forEach(function(wrapper) {
+			$(wrapper).empty().append(html.querySelector('#devices').cloneNode(true));
+
+			// Setup - add a text input to each footer cell
+			$(wrapper).find('thead tr')
+				.clone(true)
+				.addClass('filters')
+				.appendTo('#devices thead');
+
+			// Obtain filter presets
+			var filterValues = [];
+			var hiddenColumns = {};
+			var shownColumns = {};
+			var selectedColumnsOnly = false;
+
+			$(wrapper).find('thead tr th').each(function(i, th) {
+				var key = th.innerText.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, '_');
+				var classNameFilterPrefix = `wrap_toh_filter_${key}_`;
+				var classNameHidden = `wrap_toh_hide_${key}`;
+				var classNameShown = `wrap_toh_show_${key}`;
+
+				wrapper.classList.forEach(function(className) {
+					if (className.indexOf(classNameFilterPrefix) === 0) {
+						var val = className.substring(classNameFilterPrefix.length);
+
+						if (filterValues[i])
+							filterValues[i] += '|' + val;
+						else
+							filterValues[i] = val;
+					}
+					else if (className == classNameHidden) {
+						hiddenColumns[i] = true;
+					}
+					else if (className == classNameShown) {
+						shownColumns[i] = true;
+						selectedColumnsOnly = true;
+					}
+				});
+			});
+
+			// Init datatable
+			var table = $(wrapper).children('table');
+			var unorderable = [];
+			var ordering = [];
+
+			// Tweak title styles
+			table.find('tr th').each(function(colIdx, th) {
+				th.style.maxWidth = 0;
+				th.style.whiteSpace = 'nowrap';
+				th.style.overflow = 'hidden';
+				th.style.textOverflow = 'ellipsis';
+				th.title = th.innerText;
+			});
+
+			// Prepare filter inputs
+			table.find('.filters th').each(function(colIdx, th) {
+				var title = th.innerText.trim();
+
+				if (selectedColumnsOnly && !shownColumns[colIdx])
+					hiddenColumns[colIdx] = true;
+
+				if (hiddenColumns[colIdx])
+					return;
+
+				// Disable sort and filter input for fixed columns
+				if (title == 'OEM Device Homepage' || title == 'Device Page' || title == '' || filterValues[colIdx] != null) {
+					$(th).html('&nbsp;');
+					unorderable.push(colIdx);
+				}
+				// User filters for remaining columns
+				else {
+					$(th).html('<input style="width:100%" type="text" placeholder="' + title + '" />');
+					ordering.push([ colIdx, 'asc' ]);
+				}
+			});
+
+			$(wrapper).children('table').DataTable({
+				pageLength: 50,
+				orderCellsTop: true,
+				fixedHeader: true,
+				order: ordering,
+				columnDefs: [
+					{ orderable: false, targets: unorderable },
+					...Object.keys(hiddenColumns).map(colIdx => ({
+						visible: false,
+						searchable: false,
+						target: +colIdx
+					}))
+				],
+				initComplete: function () {
+					var api = this.api();
+					var datatable = this;
+
+					// For each column
+					api
+						.columns()
+						.eq(0)
+						.each(function (colIdx) {
+							var column = api.column(colIdx);
+
+							if (filterValues[colIdx] != null)
+								column.search(filterValues[colIdx], true, false).draw();
+
+							// On every keypress in this input
+							$(
+								'input',
+								$('.filters th').eq($(column.header()).index())
+							)
+								.off('keyup change')
+								.on('change', function (e) {
+									// Get the search value
+									$(this).attr('title', $(this).val());
+									var regexr = '({search})'; //$(this).parents('th').find('select').val();
+
+									var cursorPosition = this.selectionStart;
+									// Search the column for that value
+									api
+										.column(colIdx)
+										.search(
+											this.value != ''
+												? regexr.replace('{search}', '(((' + this.value + ')))')
+												: '',
+											this.value != '',
+											this.value == ''
+										)
+										.draw();
+								})
+								.on('keyup', function (e) {
+									e.stopPropagation();
+
+									$(this).trigger('change');
+									$(this)
+										.focus()[0]
+										.setSelectionRange(cursorPosition, cursorPosition);
+								});
+						});
+				},
+			});
+		});
+	});
 }
-document.addEventListener("DOMContentLoaded", function () {
-  if (document.querySelector("div.wrap_toh")) initToH();
+
+document.addEventListener('DOMContentLoaded', function() {
+	if (document.querySelector('div.wrap_toh'))
+		initToH(false);
+
+	if (document.querySelector('div.wrap_toh_full'))
+		initToH(true);
 });
