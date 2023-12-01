@@ -1,8 +1,31 @@
 (function($) {
 
+const TOH_DATA_MIN_URL = 'https://openwrt.github.io/toh/toh/index.html';
+const TOH_DATA_FULL_URL = 'https://openwrt.github.io/toh/toh-full/index.html';
+
+const TOH_PROFILES = {
+	default: {
+		source: 'min'
+	},
+	full: {
+		source: 'full'
+	},
+	supported_devices: {
+		source: 'min',
+		dom: 'frt',
+		paging: false,
+		filterColumns: {
+			supportedcurrentrel: 'snapshot|[0-9]+'
+		}
+	}
+};
+
+let resourcesLoaded = false;
+let tohTableMin, tohTableFull;
+
 function loadStyle(url) {
 	return new Promise(function(acceptFn, rejectFn) {
-		var link = document.createElement('link');
+		let link = document.createElement('link');
 
 		link.onload = acceptFn;
 		link.onerror = rejectFn;
@@ -16,7 +39,7 @@ function loadStyle(url) {
 
 function loadScript(url) {
 	return new Promise(function(acceptFn, rejectFn) {
-		var script = document.createElement('script');
+		let script = document.createElement('script');
 
 		script.onload = acceptFn;
 		script.onerror = rejectFn;
@@ -27,67 +50,88 @@ function loadScript(url) {
 	});
 }
 
+function loadResources() {
+	if (resourcesLoaded)
+		return Promise.resolve();
 
-const TOH_DATA_MIN_URL = 'https://openwrt.github.io/toh/toh/index.html';
-const TOH_DATA_FULL_URL = 'https://openwrt.github.io/toh/toh-full/index.html';
-
-const toh_profiles = {
-	supported_devices: {
-		dom: 'frt',
-		paging: false,
-		filterColumns: {
-			supported_current_release: 'snapshot|[0-9]+'
-		}
-	}
-};
-
-function initToH(full) {
-	Promise.all([
+	return Promise.all([
 		loadStyle('https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css'),
 		loadScript('https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js'),
 		loadStyle('https://cdn.datatables.net/searchpanes/2.2.0/css/searchPanes.dataTables.min.css'),
-	]).then(function() {
-		return fetch(full ? TOH_DATA_FULL_URL : TOH_DATA_MIN_URL);
-	}).then(function(toh_reply) {
-		return toh_reply.text();
-	}).then(function(toh_table) {
-		var parse = new DOMParser();
-		var html = parse.parseFromString(toh_table, 'text/html');
+	]).then(() => resourcesLoaded = true);
+}
 
-		document.querySelectorAll(full ? 'div.wrap_toh_full' : 'div.wrap_toh').forEach(function(wrapper, toh_id) {
-			$(wrapper).empty().append(html.querySelector('#devices').cloneNode(true));
+function loadMinTableData() {
+	return Promise.resolve(tohTableMin ??= fetch(TOH_DATA_MIN_URL).then(reply => reply.text()).then(markup => {
+		let parse = new DOMParser();
+		let html = parse.parseFromString(markup, 'text/html');
 
-			var table = $(wrapper).children('table');
+		return (tohTableMin = html.querySelector('#devices'));
+	}));
+}
 
-			table.attr('id', `toh_${full ? 'full' : 'min'}_${toh_id}`);
+function loadFullTableData() {
+	return Promise.resolve(tohTableFull ??= fetch(TOH_DATA_FULL_URL).then(reply => reply.text()).then(markup => {
+		let parse = new DOMParser();
+		let html = parse.parseFromString(markup, 'text/html');
+
+		return (tohTableFull = html.querySelector('#devices'));
+	}));
+}
+
+function initToH() {
+	let wrappers = document.querySelectorAll('div.wrap_toh');
+
+	if (!wrappers.length)
+		return;
+
+	loadResources().then(wrappers.forEach((wrapper, toh_id) => {
+		let profileName = 'default';
+
+		wrapper.classList.forEach(className => {
+			let m = className.match(/^wrap_toh_profile_(.+)$/);
+			if (m) profileName = m[1];
+		});
+
+		let profile = TOH_PROFILES[profileName] ?? TOH_PROFILES.default;
+
+		profile.source ??= 'min';
+		profile.filterColumns ??= {};
+		profile.hiddenColumns ??= [];
+
+		(profile.source == 'full' ? loadFullTableData() : loadMinTableData()).then(srcTable => {
+			$(wrapper).empty().append(srcTable.cloneNode(true));
+
+			let table = $(wrapper).children('table');
+
+			table.attr('id', `toh_${profile.source}_${toh_id}`);
 			table.find('a[href^="https://openwrt.org/toh/"]').each((i, a) => {
-				var m = a.href.match(/^https:\/\/openwrt\.org\/toh\/([^\/]+)\/([^\/]+)$/);
-				if (m)
-					$(a).replaceWith(`<a href="/toh/${m[1]}/${m[2]}" class="wikilink1" title="toh:${m[1]}:${m[2]}">${m[2]}</a>`)
+				let m = a.href.match(/^https:\/\/openwrt\.org\/toh\/([^\/]+)\/([^\/]+)$/);
+				if (m) $(a).replaceWith(`<a href="/toh/${m[1]}/${m[2]}" class="wikilink1" title="toh:${m[1]}:${m[2]}">${m[2]}</a>`)
 			});
 
 			// Obtain filter presets
-			var filterValues = [];
-			var hiddenColumns = {};
-			var shownColumns = {};
-			var selectedColumnsOnly = false;
-			var pageLength = 50;
-			var profile;
-
-			Object.keys(toh_profiles).forEach(profileName => {
-				if (wrapper.classList.contains(`wrap_toh_profile_${profileName}`))
-					profile = toh_profiles[profileName];
-			});
+			let filterValues = [];
+			let hiddenColumns = {};
+			let shownColumns = {};
+			let selectedColumnsOnly = false;
+			let pageLength = 50;
 
 			$(wrapper).find('thead tr th').each(function(i, th) {
-				var key = th.innerText.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, '_');
-				var classNameFilterPrefix = `wrap_toh_filter_${key}_`;
-				var classNameHidden = `wrap_toh_hide_${key}`;
-				var classNameShown = `wrap_toh_show_${key}`;
+				let key = `column_${i}`;
+
+				th.classList.forEach(className => {
+					let m = className.match(/^toh_(.+)$/);
+					if (m) key = m[1];
+				});
+
+				let classNameFilterPrefix = `wrap_toh_filter_${key}_`;
+				let classNameHidden = `wrap_toh_hide_${key}`;
+				let classNameShown = `wrap_toh_show_${key}`;
 
 				wrapper.classList.forEach(function(className) {
 					if (className.indexOf(classNameFilterPrefix) === 0) {
-						var val = className.substring(classNameFilterPrefix.length);
+						let val = className.substring(classNameFilterPrefix.length);
 
 						if (filterValues[i])
 							filterValues[i] += '|' + val;
@@ -103,10 +147,10 @@ function initToH(full) {
 					}
 				});
 
-				if (profile?.filterColumns?.[key])
+				if (profile.filterColumns[key])
 					filterValues[i] = profile?.filterColumns[key];
 
-				if (profile?.hiddenColumns?.includes(key))
+				if (profile.hiddenColumns.includes(key))
 					hiddenColumns[i] = true;
 			});
 
@@ -117,8 +161,8 @@ function initToH(full) {
 				.appendTo(table.children('thead'));
 
 			// Init datatable
-			var unorderable = [];
-			var ordering = [];
+			let unorderable = [];
+			let ordering = [];
 
 			// Tweak title styles
 			table.find('tr th').each(function(colIdx, th) {
@@ -131,7 +175,7 @@ function initToH(full) {
 
 			// Prepare filter inputs
 			table.find('.filters th').each(function(colIdx, th) {
-				var title = th.innerText.trim();
+				let title = th.innerText.trim();
 
 				if (selectedColumnsOnly && !shownColumns[colIdx])
 					hiddenColumns[colIdx] = true;
@@ -172,29 +216,29 @@ function initToH(full) {
 					}))
 				],
 				initComplete: function () {
-					var api = this.api();
-					var datatable = this;
+					let api = this.api();
+					let datatable = this;
 
 					// For each column
 					api
 						.columns()
 						.eq(0)
 						.each(function (colIdx) {
-							var column = api.column(colIdx);
+							let column = api.column(colIdx);
 
 							if (filterValues[colIdx] != null)
 								column.search(filterValues[colIdx], true, false).draw();
 
 							// On every keypress in this input
-							var th = table.find('.filters th').eq(colIdx);
+							let th = table.find('.filters th').eq(colIdx);
 							$(th.children('input'), th)
 								.off('keyup change')
 								.on('keyup change', function (e) {
 									e.stopPropagation();
 									// Get the search value
 									$(this).attr('title', $(this).val());
-									var regexr = '({search})'; //$(this).parents('th').find('select').val();
-									var cursorPosition = this.selectionStart;
+									let regexr = '({search})'; //$(this).parents('th').find('select').val();
+									let cursorPosition = this.selectionStart;
 									// Search the column for that value
 									api
 										.column(colIdx)
@@ -210,13 +254,9 @@ function initToH(full) {
 				},
 			});
 		});
-	});
+	}));
 }
 
-if (document.querySelector('div.wrap_toh'))
-	initToH(false);
-
-if (document.querySelector('div.wrap_toh_full'))
-	initToH(true);
+initToH();
 
 })(jQuery);
