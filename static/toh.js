@@ -15,13 +15,22 @@ const TOH_PROFILES = {
 		dom: 'frt',
 		paging: false,
 		filterColumns: {
-			supportedcurrentrel: 'snapshot|[0-9]+'
+			supportedcurrentrel: [ '^snapshot', '^[0-9]+' ]
+		}
+	},
+	available_12128: {
+		source: 'full',
+		filterColumns: {
+			model: [ '!@@Model@@', '!\\(EXAMPLE\\)' ],
+			availability: '!Discontinued.*',
+			flash_mb: '!^(1|2|4|8)$',
+			ram_mb: '!^(8|16|32|64)$',
+			supportedcurrentrel: '!^(EOL|-|)$'
 		}
 	}
 };
 
-let resourcesLoaded = false;
-let tohTableMin, tohTableFull;
+let resourcesLoaded, tohTableMin, tohTableFull;
 
 function loadStyle(url) {
 	return new Promise(function(acceptFn, rejectFn) {
@@ -51,14 +60,39 @@ function loadScript(url) {
 }
 
 function loadResources() {
-	if (resourcesLoaded)
-		return Promise.resolve();
-
-	return Promise.all([
+	return Promise.resolve(resourcesLoaded ??= Promise.all([
 		loadStyle('https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css'),
 		loadScript('https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js'),
 		loadStyle('https://cdn.datatables.net/searchpanes/2.2.0/css/searchPanes.dataTables.min.css'),
-	]).then(() => resourcesLoaded = true);
+	]).then(() => {
+		$.fn.dataTable.ext.search.push(
+			function (settings, searchData, index, rowData, counter) {
+				let filterValues = $(settings.nTable).data('presetFilter');
+
+				for (let colIdx in filterValues) {
+					let colValue = searchData[+colIdx];
+					let searchPatterns = Array.isArray(filterValues[colIdx]) ? filterValues[colIdx] : [ filterValues[colIdx] ];
+
+					for (let i = 0; i < searchPatterns.length; i++) {
+						let searchPattern = searchPatterns[i];
+						let expectMatch = true;
+
+						if (searchPattern.charAt(0) == '!') {
+							searchPattern = searchPattern.substring(1);
+							expectMatch = false;
+						}
+
+						if ((new RegExp(searchPattern).test(colValue)) != expectMatch)
+							return false;
+					}
+				}
+
+				return true;
+			}
+		);
+
+		resourcesLoaded = true;
+	}));
 }
 
 function loadMinTableData() {
@@ -79,13 +113,37 @@ function loadFullTableData() {
 	}));
 }
 
+function findSettings(node) {
+	let v;
+
+	for (var i = 0; i < node.childNodes.length; i++) {
+		switch (node.childNodes[i].nodeType) {
+		case 1:
+			if ((v = findSettings(node.childNodes[i])) != null)
+				return v;
+			break;
+
+		case 8:
+			try {
+				if ((v = JSON.parse(node.childNodes[i].data)) != null)
+					return v;
+			} catch(e) {
+				console.error('Error while parsing ToH settings: ' + e);
+			}
+			break;
+		}
+	}
+
+	return null;
+}
+
 function initToH() {
 	let wrappers = document.querySelectorAll('div.wrap_toh');
 
 	if (!wrappers.length)
 		return;
 
-	loadResources().then(wrappers.forEach((wrapper, toh_id) => {
+	loadResources().then(() => wrappers.forEach((wrapper, toh_id) => {
 		let profileName = 'default';
 
 		wrapper.classList.forEach(className => {
@@ -93,7 +151,7 @@ function initToH() {
 			if (m) profileName = m[1];
 		});
 
-		let profile = TOH_PROFILES[profileName] ?? TOH_PROFILES.default;
+		let profile = findSettings(wrapper) ?? TOH_PROFILES[profileName] ?? TOH_PROFILES.default;
 
 		profile.source ??= 'min';
 		profile.filterColumns ??= {};
@@ -108,6 +166,10 @@ function initToH() {
 			table.find('a[href^="https://openwrt.org/toh/"]').each((i, a) => {
 				let m = a.href.match(/^https:\/\/openwrt\.org\/toh\/([^\/]+)\/([^\/]+)$/);
 				if (m) $(a).replaceWith(`<a href="/toh/${m[1]}/${m[2]}" class="wikilink1" title="toh:${m[1]}:${m[2]}">${m[2]}</a>`)
+			});
+			table.find('td').each((i, td) => {
+				if (td.childNodes.length == 1 && td.firstChild.nodeType == 3)
+					td.firstChild.data = td.firstChild.data.replace(/,/g, ', ');
 			});
 
 			// Obtain filter presets
@@ -167,11 +229,14 @@ function initToH() {
 			// Tweak title styles
 			table.find('tr th').each(function(colIdx, th) {
 				th.style.maxWidth = 0;
+				th.style.minWidth = '3em';
 				th.style.whiteSpace = 'nowrap';
 				th.style.overflow = 'hidden';
 				th.style.textOverflow = 'ellipsis';
 				th.title = th.innerText;
 			});
+
+			table.data('presetFilter', filterValues);
 
 			// Prepare filter inputs
 			table.find('.filters th').each(function(colIdx, th) {
@@ -188,8 +253,8 @@ function initToH() {
 					$(th).html('&nbsp;');
 					unorderable.push(colIdx);
 				}
-				// Disable filter input for filtered columns
-				else if (th.classList.contains('toh_devicepage') || filterValues[colIdx] != null) {
+				// Disable filter input for device page
+				else if (th.classList.contains('toh_devicepage')) {
 					$(th).html('&nbsp;');
 					ordering.push([ colIdx, 'asc' ]);
 				}
@@ -225,9 +290,6 @@ function initToH() {
 						.eq(0)
 						.each(function (colIdx) {
 							let column = api.column(colIdx);
-
-							if (filterValues[colIdx] != null)
-								column.search(filterValues[colIdx], true, false).draw();
 
 							// On every keypress in this input
 							let th = table.find('.filters th').eq(colIdx);
