@@ -15,7 +15,12 @@
             <th class="toh_flashmb">Flash</th>
             <th class="toh_rammb">RAM</th>
             <th class="toh_ethernet100mports">100M ports</th>
-            <th class="toh_ethernetgbitports">1G ports</th>
+            <th class="toh_ethernet1gports">1G ports</th>
+            <th class="toh_ethernet2_5gports">2.5G ports</th>
+            <th class="toh_ethernet5gports">5G ports</th>
+            <th class="toh_ethernet10gports">10G ports</th>
+            <th class="sfp_ports">SFP ports</th>
+            <th class="sfp_plus_ports">SFP+ ports</th>
             <th class="toh_wlanhardware">WiFi hardware</th>
             <th class="toh_wlan24ghz">WiFi 2.4GHz</th>
             <th class="toh_wlan50ghz">WiFi 5GHz</th>
@@ -41,7 +46,12 @@
         <td>{{ device.flashmb }}</td>
         <td>{{ device.rammb }}</td>
         <td>{{ device.ethernet100mports }}</td>
-        <td>{{ device.ethernetgbitports }}</td>
+        <td>{{ device.ethernet1gports }}</td>
+        <td>{{ device.ethernet2_5gports }}</td>
+        <td>{{ device.ethernet5gports }}</td>
+        <td>{{ device.ethernet10gports }}</td>
+        <td>{{ device.sfp_ports }}</td>
+        <td>{{ device.sfp_plus_ports }}</td>
         <td>{% if device.wlanhardware %}{{ device.wlanhardware }}{% endif %}</td>
         <td>{{ device.wlan24ghz }}</td>
         <td>{{ device.wlan50ghz }}</td>
