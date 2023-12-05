@@ -6,6 +6,8 @@
             <th class="toh_brand">Brand</th>
             <th class="toh_model">Model</th>
             <th class="toh_version">Version</th>
+            <th class="toh_target">Target</th>
+            <th class="toh_subtarget">Subtarget</th>
             <th class="toh_availability">Availability</th>
             <th class="toh_supportedcurrentrel">Supported Current Release</th>
             <th class="toh_unsupported_functions">Unsupported Functions</th>
@@ -37,6 +39,8 @@
         <td>{{ device.brand }}</td>
         <td>{{ device.model }}</td>
         <td>{% if device.version %}{{ device.version }}{% endif %}</td>
+        <td>{{ device.target }}</td>
+        <td>{{ device.subtarget }}</td>
         <td>{% if device.availability %}{{ device.availability }}{% endif %}</td>
         <td>{% if device.supportedcurrentrel %}{{ device.supportedcurrentrel }}{% endif %}</td>
         <td>{% if device.unsupported_functions %}{{ device.unsupported_functions }}{% endif %}</td>
