@@ -106,11 +106,10 @@ function loadFullTableData() {
 function initToH() {
 	let wrappers = [...document.querySelectorAll('div.wrap_toh')];
 
-	let comment;
 	const iter = document.createNodeIterator(document.body, NodeFilter.SHOW_COMMENT,
 		node => node.data.match(/^\s*ToH:\s*\{/s) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT);
 
-	while ((comment = iter.nextNode()) != null) {
+	for (let comment = iter.nextNode(); comment != null; comment = iter.nextNode()) {
 		let wrapper = document.createElement('div');
 		wrapper.classList.add('toh');
 		wrapper.setAttribute('data-settings', comment.data.replace(/^\s*ToH:/s, '').trim());
@@ -196,6 +195,9 @@ function initToH() {
 
 				if (profile.hiddenColumns.includes(key))
 					hiddenColumns[i] = true;
+
+				let m = location.href.match(new RegExp(`[?&;]toh\\.filter\\.${key}=([^?&;]+)`));
+				if (m) filterValues[i] = m[1];
 			});
 
 			// Setup - add a text input to each footer cell
