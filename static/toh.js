@@ -15,16 +15,6 @@ const TOH_PROFILES = {
 		dom: 'frt',
 		paging: false,
 		filterColumns: {
-			supportedcurrentrel: [ '^snapshot', '^[0-9]+' ]
-		}
-	},
-	available_12128: {
-		source: 'full',
-		filterColumns: {
-			model: [ '!@@Model@@', '!\\(EXAMPLE\\)' ],
-			availability: '!Discontinued.*',
-			flash_mb: '!^(1|2|4|8)$',
-			ram_mb: '!^(8|16|32|64)$',
 			supportedcurrentrel: '!^(EOL|-|)$'
 		}
 	}
@@ -113,32 +103,21 @@ function loadFullTableData() {
 	}));
 }
 
-function findSettings(node) {
-	let v;
-
-	for (var i = 0; i < node.childNodes.length; i++) {
-		switch (node.childNodes[i].nodeType) {
-		case 1:
-			if ((v = findSettings(node.childNodes[i])) != null)
-				return v;
-			break;
-
-		case 8:
-			try {
-				if ((v = JSON.parse(node.childNodes[i].data)) != null)
-					return v;
-			} catch(e) {
-				console.error('Error while parsing ToH settings: ' + e);
-			}
-			break;
-		}
-	}
-
-	return null;
-}
-
 function initToH() {
-	let wrappers = document.querySelectorAll('div.wrap_toh');
+	let wrappers = [...document.querySelectorAll('div.wrap_toh')];
+
+	let comment;
+	const iter = document.createNodeIterator(document.body, NodeFilter.SHOW_COMMENT,
+		node => node.data.match(/^\s*ToH:\s*\{/s) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT);
+
+	while ((comment = iter.nextNode()) != null) {
+		let wrapper = document.createElement('div');
+		wrapper.classList.add('toh');
+		wrapper.setAttribute('data-settings', comment.data.replace(/^\s*ToH:/s, '').trim());
+		wrapper.innerHTML = 'Loading data...';
+		wrappers.push(wrapper);
+		$(comment).replaceWith(wrapper);
+	}
 
 	if (!wrappers.length)
 		return;
@@ -151,16 +130,19 @@ function initToH() {
 			if (m) profileName = m[1];
 		});
 
-		let profile = findSettings(wrapper) ?? TOH_PROFILES[profileName] ?? TOH_PROFILES.default;
+		let profile;
+		try { profile = JSON.parse(wrapper.getAttribute('data-settings')); }
+		catch(e) { console.error('Error parsing ToH settings: ' + e); }
 
+		profile ??= TOH_PROFILES[profileName] ?? TOH_PROFILES.default;
 		profile.source ??= 'min';
 		profile.filterColumns ??= {};
 		profile.hiddenColumns ??= [];
 
 		(profile.source == 'full' ? loadFullTableData() : loadMinTableData()).then(srcTable => {
-			$(wrapper).empty().append(srcTable.cloneNode(true));
+			let table = $(srcTable.cloneNode(true));
 
-			let table = $(wrapper).children('table');
+			$(wrapper).empty().append(table);
 
 			table.attr('id', `toh_${profile.source}_${toh_id}`);
 			table.find('a[href^="https://openwrt.org/toh/"]').each((i, a) => {
@@ -179,7 +161,7 @@ function initToH() {
 			let selectedColumnsOnly = false;
 			let pageLength = 50;
 
-			$(wrapper).find('thead tr th').each(function(i, th) {
+			table.find('thead tr th').each(function(i, th) {
 				let key = `column_${i}`;
 
 				th.classList.forEach(className => {
@@ -217,7 +199,7 @@ function initToH() {
 			});
 
 			// Setup - add a text input to each footer cell
-			$(wrapper).find('thead tr')
+			table.find('thead tr')
 				.clone(true)
 				.addClass('filters')
 				.appendTo(table.children('thead'));
