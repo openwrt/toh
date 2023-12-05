@@ -27,6 +27,8 @@
             <th class="toh_wlan24ghz">WiFi 2.4GHz</th>
             <th class="toh_wlan50ghz">WiFi 5GHz</th>
             <th class="toh_usbports">USB ports</th>
+            <th class="toh_owrt_forum_topic_url">Forum Topic</th>
+            <th class="toh_oemdevicehomepageurl">OEM Homepage</th>
             <th class="toh_devicepage">Device Page</th>
             <th class="toh_page"></th>
         </tr>
@@ -60,6 +62,8 @@
         <td>{{ device.wlan24ghz }}</td>
         <td>{{ device.wlan50ghz }}</td>
         <td>{{ device.usbports }}</td>
+        <td>{% if device.owrt_forum_topic_url %}<a href="{{ device.owrt_forum_topic_url }}">forum</a>{% else %}-{% endif %}</td>
+        <td>{% if device.oemdevicehomepageurl %}<a href="{{ device.oemdevicehomepageurl }}">external</a>{% else %}-{% endif %}</td>
         <td>{% if device.devicepage %}<a href="https://openwrt.org/{{ device.devicepage | replace(from=':', to='/') | safe}}">Device Page</a>{% else %}-{% endif %}</td>
         <td><a href="https://openwrt.org/{{ device.page | replace(from=':', to='/') | safe}}">Edit</a></td>
     </tr>
