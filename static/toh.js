@@ -2,25 +2,9 @@
 
 const TOH_DATA_MIN_URL = 'https://openwrt.github.io/toh/toh/index.html';
 const TOH_DATA_FULL_URL = 'https://openwrt.github.io/toh/toh-full/index.html';
+const TOH_DATA_JSON_URL = 'https://openwrt.org/toh.json';
 
-const TOH_PROFILES = {
-	default: {
-		source: 'min'
-	},
-	full: {
-		source: 'full'
-	},
-	supported_devices: {
-		source: 'min',
-		dom: 'frt',
-		paging: false,
-		filterColumns: {
-			supportedcurrentrel: '!^(EOL|-|)$'
-		}
-	}
-};
-
-let resourcesLoaded, tohTableMin, tohTableFull;
+let resourcesLoaded, tohTableMin, tohTableFull, tohTableJSON;
 
 function loadStyle(url) {
 	return new Promise(function(acceptFn, rejectFn) {
@@ -54,35 +38,60 @@ function loadResources() {
 		loadStyle('https://cdn.datatables.net/1.13.7/css/jquery.dataTables.css'),
 		loadScript('https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js'),
 		loadStyle('https://cdn.datatables.net/searchpanes/2.2.0/css/searchPanes.dataTables.min.css'),
-	]).then(() => {
-		$.fn.dataTable.ext.search.push(
-			function (settings, searchData, index, rowData, counter) {
-				let filterValues = $(settings.nTable).data('presetFilter');
+	]).then(() => resourcesLoaded = true));
+}
 
-				for (let colIdx in filterValues) {
-					let colValue = searchData[+colIdx];
-					let searchPatterns = Array.isArray(filterValues[colIdx]) ? filterValues[colIdx] : [ filterValues[colIdx] ];
+function tableToData(table) {
+	let data = {
+		columns: [],
+		captions: [],
+		entries: []
+	};
 
-					for (let i = 0; i < searchPatterns.length; i++) {
-						let searchPattern = searchPatterns[i];
-						let expectMatch = true;
+	table.querySelectorAll('thead > tr > th').forEach((th, i) => {
+		let colName;
 
-						if (searchPattern.charAt(0) == '!') {
-							searchPattern = searchPattern.substring(1);
-							expectMatch = false;
-						}
+		th.classList.forEach(className => {
+			let m = className.match(/^toh_(.+)$/);
+			if (m) colName = m[1];
+		})
 
-						if ((new RegExp(searchPattern).test(colValue)) != expectMatch)
-							return false;
-					}
-				}
+		switch (colName) {
+		case 'edit': colName = 'deviceid'; break;
+		case 'page': colName = 'devicepage'; break;
+		}
 
-				return true;
+		data.columns.push(colName ?? `column_${i}`);
+		data.captions.push(th.innerText ?? '');
+	});
+
+	table.querySelectorAll('tbody > tr').forEach(tr => {
+		let row = [];
+
+		tr.querySelectorAll('td').forEach((td, i) => {
+			switch (data.columns[i]) {
+			case 'deviceid':
+				row.push(td.querySelector('a[href]')?.href.replace(/^.+\/toh\/hwdata\//, '').replace('/', ':'));
+				break;
+
+			case 'devicepage':
+				row.push(td.querySelector('a[href]')?.href.replace(/^.+\/toh\//, 'toh:').replace('/', ':'));
+				break;
+
+			default:
+				const urls = td.querySelectorAll('a[href]');
+				if (urls?.length)
+					row.push([...urls].map(a => a.href));
+				else
+					row.push(td.innerText);
+				break;
 			}
-		);
+		});
 
-		resourcesLoaded = true;
-	}));
+		data.entries.push(row);
+	});
+
+	return data;
 }
 
 function loadMinTableData() {
@@ -90,7 +99,7 @@ function loadMinTableData() {
 		let parse = new DOMParser();
 		let html = parse.parseFromString(markup, 'text/html');
 
-		return (tohTableMin = html.querySelector('#devices'));
+		return (tohTableMin = tableToData(html.querySelector('#devices')));
 	}));
 }
 
@@ -99,8 +108,175 @@ function loadFullTableData() {
 		let parse = new DOMParser();
 		let html = parse.parseFromString(markup, 'text/html');
 
-		return (tohTableFull = html.querySelector('#devices'));
+		return (tohTableFull = tableToData(html.querySelector('#devices')));
 	}));
+}
+
+function formatValue(colName, value) {
+	switch (colName) {
+	case 'oemdevicehomepageurl':
+	case 'firmwareoemstockurl':
+	case 'firmwareopenwrtinstallurl':
+	case 'firmwareopenwrtupgradeurl':
+	case 'firmwareopenwrtsnapshotinstallurl':
+	case 'firmwareopenwrtsnapshotupgradeurl':
+		{
+			let a = document.createElement('a');
+			a.classList.add('urlextern');
+			a.rel = 'nofollow';
+			a.href = value;
+			a.text = value;
+			return a;
+		}
+
+	case 'deviceid':
+		{
+			let a = document.createElement('a');
+			a.classList.add('wikilink1');
+			a.title = `toh:hwdata:${value}`;
+			a.href = `/toh/hwdata/${value.replace(/:/g, '/')}`;
+			a.text = 'Edit';
+			return a;
+		}
+
+	case 'devicepage':
+		{
+			let a = document.createElement('a');
+			a.classList.add('wikilink1');
+			a.title = value;
+			a.href = `/${value.replace(/:/g, '/')}`;
+			a.text = value.replace(/^.+:/, '');
+			return a;
+		}
+
+	case 'target':
+		{
+			let a = document.createElement('a');
+			a.classList.add('wikilink1');
+			a.title = `docs:techref:targets:${value}`;
+			a.href = `/docs/techref/targets/${value}`;
+			a.text = value;
+			return a;
+		}
+
+	case 'supportedcurrentrel':
+		{
+			let a = document.createElement('a');
+			a.classList.add('wikilink1');
+			a.title = `releases:${value}`;
+			a.href = `/releases/${value}`;
+			a.text = value;
+			return a;
+		}
+
+	default:
+		return document.createTextNode(value ?? '');
+	}
+}
+
+function formatList(colName, values) {
+	let res = document.createDocumentFragment();
+
+	for (let i = 0; i < values.length; i++) {
+		if (i > 0)
+			res.appendChild(document.createTextNode(', '));
+
+		res.appendChild(formatValue(colName, values[i]));
+	}
+
+	return res;
+}
+
+function loadJSONTableData() {
+	return Promise.resolve(tohTableJSON ??= fetch(TOH_DATA_JSON_URL).then(reply => reply.json()).then(data => {
+		return (tohTableJSON = data);
+	}));
+}
+
+function dataToTable(data, columnOrder, filterColumns) {
+	let table = document.createElement('table');
+	let columnFilter = data.columns.map((k, i) => filterColumns?.[k]).map(f => {
+		if (!f)
+			return () => true;
+
+		let matcher = (Array.isArray(f) ? f : [ f ]).map(f => [
+			new RegExp(f.replace(/^!/, ''), 'i'),
+			f.charAt(0) != '!'
+		]);
+
+		return value => {
+			for (let v of Array.isArray(value) ? value : [ value ?? '' ])
+				for (let match of matcher)
+					if (match[0].test(v) == match[1])
+						return true;
+
+			return false;
+		};
+	});
+
+	columnOrder ??= data.columns.map((k, i) => i);
+
+	table.style.width = '100%';
+	table.classList.add('table', 'table-striped', 'table-sm');
+	table.innerHTML = '<thead><tr></tr><tr class="filters"></tr></thead><tbody></tbody>'
+
+	columnOrder.forEach(colSrcIdx => {
+		let th = document.createElement('th');
+
+		if (data.columns[colSrcIdx] != 'deviceid') {
+			th.appendChild(document.createTextNode(data.captions[colSrcIdx]));
+			th.title = data.captions[colSrcIdx];
+		}
+
+		th.classList.add(`toh_${data.columns[colSrcIdx]}`);
+		th.style.maxWidth = 0;
+		th.style.minWidth = '3em';
+		th.style.whiteSpace = 'nowrap';
+		th.style.overflow = 'hidden';
+		th.style.textOverflow = 'ellipsis';
+		table.firstElementChild.firstElementChild.appendChild(th);
+
+		let filter = document.createElement('th');
+
+		switch (data.columns[colSrcIdx]) {
+		case 'deviceid':
+		case 'devicepage':
+			break;
+
+		default:
+			filter.appendChild(document.createElement('input'));
+			filter.firstElementChild.type = 'text';
+			filter.firstElementChild.placeholder = data.captions[colSrcIdx];
+			filter.firstElementChild.style.width = '100%';
+			break;
+		}
+
+		table.firstElementChild.lastElementChild.appendChild(filter);
+	});
+
+	data.entries.forEach((record, rowIdx) => {
+		for (let i = 0; i < record.length; i++)
+			if (!columnFilter[i](record[i]))
+				return;
+
+		let tr = document.createElement('tr');
+
+		columnOrder.forEach(colSrcIdx => {
+			let value = record[colSrcIdx];
+			let td = document.createElement('td');
+
+			if (Array.isArray(value))
+				td.appendChild(formatList(data.columns[colSrcIdx], value));
+			else if (value != null)
+				td.appendChild(formatValue(data.columns[colSrcIdx], value));
+
+			tr.appendChild(td);
+		});
+
+		table.lastElementChild.appendChild(tr);
+	});
+
+	return table;
 }
 
 function initToH() {
@@ -133,44 +309,28 @@ function initToH() {
 		try { profile = JSON.parse(wrapper.getAttribute('data-settings')); }
 		catch(e) { console.error('Error parsing ToH settings: ' + e); }
 
-		profile ??= TOH_PROFILES[profileName] ?? TOH_PROFILES.default;
+		profile ??= {};
 		profile.source ??= 'min';
-		profile.filterColumns ??= {};
-		profile.hiddenColumns ??= [];
 
-		(profile.source == 'full' ? loadFullTableData() : loadMinTableData()).then(srcTable => {
-			let table = $(srcTable.cloneNode(true));
+		let loadSource;
+		switch (profile.source) {
+		case 'json': loadSource = loadJSONTableData(); break;
+		case 'full': loadSource = loadFullTableData(); break;
+		default:     loadSource = loadMinTableData(); break;
+		}
 
-			$(wrapper).empty().append(table);
-
-			table.attr('id', `toh_${profile.source}_${toh_id}`);
-			table.find('a[href^="https://openwrt.org/toh/"]').each((i, a) => {
-				let m = a.href.match(/^https:\/\/openwrt\.org\/toh\/([^\/]+)\/([^\/]+)$/);
-				if (m) $(a).replaceWith(`<a href="/toh/${m[1]}/${m[2]}" class="wikilink1" title="toh:${m[1]}:${m[2]}">${m[2]}</a>`)
-			});
-			table.find('td').each((i, td) => {
-				if (td.childNodes.length == 1 && td.firstChild.nodeType == 3)
-					td.firstChild.data = td.firstChild.data.replace(/,/g, ', ');
-			});
-
+		loadSource.then(srcData => {
 			// Obtain filter presets
 			let filterValues = [];
-			let hiddenColumns = {};
-			let shownColumns = {};
-			let selectedColumnsOnly = false;
+			let hiddenColumns = profile.hiddenColumns ?? [];
+			let shownColumns = profile.shownColumns ?? [];
+			let filterColumns = profile.filterColumns ?? {};
 			let pageLength = 50;
 
-			table.find('thead tr th').each(function(i, th) {
-				let key = `column_${i}`;
-
-				th.classList.forEach(className => {
-					let m = className.match(/^toh_(.+)$/);
-					if (m) key = m[1];
-				});
-
-				let classNameFilterPrefix = `wrap_toh_filter_${key}_`;
-				let classNameHidden = `wrap_toh_hide_${key}`;
-				let classNameShown = `wrap_toh_show_${key}`;
+			srcData.columns.forEach((colName, i) => {
+				let classNameFilterPrefix = `wrap_toh_filter_${colName}_`;
+				let classNameHidden = `wrap_toh_hide_${colName}`;
+				let classNameShown = `wrap_toh_show_${colName}`;
 
 				wrapper.classList.forEach(function(className) {
 					if (className.indexOf(classNameFilterPrefix) === 0) {
@@ -182,123 +342,60 @@ function initToH() {
 							filterValues[i] = val;
 					}
 					else if (className == classNameHidden) {
-						hiddenColumns[i] = true;
+						hiddenColumns.push(colName);
 					}
-					else if (className == classNameShown) {
-						shownColumns[i] = true;
-						selectedColumnsOnly = true;
+					else if (className == classNameShown && !shownColumns.includes(colName)) {
+						shownColumns.push(colName);
 					}
 				});
 
-				if (profile.filterColumns[key])
-					filterValues[i] = profile?.filterColumns[key];
-
-				if (profile.hiddenColumns.includes(key))
-					hiddenColumns[i] = true;
-
-				let m = location.href.match(new RegExp(`[?&;]toh\\.filter\\.${key}=([^?&;]+)`));
-				if (m) filterValues[i] = m[1];
+				let m = location.href.match(new RegExp(`[?&;]toh\\.filter\\.${colName}=([^?&;]+)`));
+				if (m) filterColumns[colName] = m[1];
 			});
 
-			// Setup - add a text input to each footer cell
-			table.find('thead tr')
-				.clone(true)
-				.addClass('filters')
-				.appendTo(table.children('thead'));
+			if (shownColumns.length && !shownColumns.includes('deviceid'))
+				shownColumns.push('deviceid');
+			else if (!shownColumns.length)
+				shownColumns = [ ...srcData.columns.filter(k => k != 'deviceid'), 'deviceid' ];
 
-			// Init datatable
-			let unorderable = [];
-			let ordering = [];
+			for (let colName of hiddenColumns)
+				shownColumns = shownColumns.filter(k => k != colName);
 
-			// Tweak title styles
-			table.find('tr th').each(function(colIdx, th) {
-				th.style.maxWidth = 0;
-				th.style.minWidth = '3em';
-				th.style.whiteSpace = 'nowrap';
-				th.style.overflow = 'hidden';
-				th.style.textOverflow = 'ellipsis';
-				th.title = th.innerText;
-			});
+			const columnOrder = shownColumns.map(colName => srcData.columns.indexOf(colName));
+			let table = $(dataToTable(srcData, columnOrder, filterColumns));
 
-			table.data('presetFilter', filterValues);
-
-			// Prepare filter inputs
-			table.find('.filters th').each(function(colIdx, th) {
-				let title = th.innerText.trim();
-
-				if (selectedColumnsOnly && !shownColumns[colIdx])
-					hiddenColumns[colIdx] = true;
-
-				if (hiddenColumns[colIdx])
-					return;
-
-				// Disable sort and filter input for fixed columns
-				if (th.classList.contains('toh_edit') || th.classList.contains('toh_page')) {
-					$(th).html('&nbsp;');
-					unorderable.push(colIdx);
-				}
-				// Disable filter input for device page
-				else if (th.classList.contains('toh_devicepage')) {
-					$(th).html('&nbsp;');
-					ordering.push([ colIdx, 'asc' ]);
-				}
-				// User filters for remaining columns
-				else {
-					$(th).html('<input style="width:100%" type="text" placeholder="' + title + '" />');
-					ordering.push([ colIdx, 'asc' ]);
-				}
-			});
-
-			table.DataTable({
+			$(wrapper).hide().empty().append(table);
+			$(wrapper).find('table').DataTable({
 				dom: profile?.dom ?? 'lfrtip',
 				paging: profile?.paging ?? true,
 				pageLength: profile?.pageLength ?? 50,
 				orderCellsTop: true,
 				fixedHeader: true,
-				order: ordering,
-				columnDefs: [
-					{ orderable: false, targets: unorderable },
-					...Object.keys(hiddenColumns).map(colIdx => ({
-						visible: false,
-						searchable: false,
-						target: +colIdx
-					}))
-				],
+				order: shownColumns.map((k, i) => [k, i]).filter(e => e[0] != 'deviceid').map(e => [e[1], 'asc']),
+				columnDefs: [ { orderable: false, targets: [ shownColumns.indexOf('deviceid') ] } ],
 				initComplete: function () {
 					let api = this.api();
 					let datatable = this;
 
 					// For each column
-					api
-						.columns()
-						.eq(0)
-						.each(function (colIdx) {
-							let column = api.column(colIdx);
-
-							// On every keypress in this input
-							let th = table.find('.filters th').eq(colIdx);
-							$(th.children('input'), th)
-								.off('keyup change')
-								.on('keyup change', function (e) {
-									e.stopPropagation();
-									// Get the search value
-									$(this).attr('title', $(this).val());
-									let regexr = '({search})'; //$(this).parents('th').find('select').val();
-									let cursorPosition = this.selectionStart;
-									// Search the column for that value
-									api
-										.column(colIdx)
-										.search(
-											(this.value != "") ? regexr.replace('{search}', '((('+this.value+')))') : "",
-											this.value != "",
-											this.value == "")
-										.draw();
-
-									$(this).focus()[0].setSelectionRange(cursorPosition, cursorPosition);
-								});
+					api.columns().eq(0).each(colIdx => {
+						// On every input in the filter cell
+						table.find('.filters th').eq(colIdx).off('input').on('input', e => {
+							const v = e.target.value;
+							e.stopPropagation();
+							api.column(colIdx).search(v != '' ? `(${v.replace(/[/\-\\^$*+?.()|[\]{}]/g, c => {
+								switch (c) {
+								case '*': return '.*';
+								case '?': return '.';
+								default:  return `\\${c}`;
+								}
+							})})` : '', v != '', v == '').draw();
 						});
+					});
 				},
 			});
+
+			$(wrapper).show();
 		});
 	}));
 }
