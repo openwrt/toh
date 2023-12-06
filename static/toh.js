@@ -141,7 +141,7 @@ function formatValue(colName, value) {
 			return formatLink(value, `Archive thread #${m[1]}`);
 		else if ((m = value.match(/\bviewtopic\.php\?pid=(\d+)\b/)) != null)
 			return formatLink(value, `Archive post #${m[1]}`);
-		else if ((m = value.match(/\/t\/([^\/]{5,})(?:\/\d+\b|$)/)) != null)
+		else if ((m = value.match(/\/t\/([^\/]{5,})(?:\/\d+\b|\/?$)/)) != null)
 			return formatLink(value, `Discourse: ${m[1]}`);
 		else
 			return formatLink(value, value);
