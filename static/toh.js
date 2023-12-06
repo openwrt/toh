@@ -172,7 +172,7 @@ function formatValue(colName, value) {
 		return formatLink(`/toh/hwdata/${value.replace(/:/g, '/')}`, 'Edit', true);
 
 	case 'devicepage':
-		return formatLink(`/${value.replace(/:/g, '/')}`, value.replace(/^.+/, ''), true);
+		return formatLink(`/${value.replace(/:/g, '/')}`, value.replace(/^.+[:\/]/, ''), true);
 
 	case 'target':
 		return formatLink(`/docs/techref/targets/${value}`, value, true);
