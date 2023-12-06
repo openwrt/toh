@@ -135,7 +135,10 @@ function formatValue(colName, value) {
 
 	switch (colName) {
 	case 'oemdevicehomepageurl':
-		return formatLink(value, value);
+		if ((m = value.match(/^https?:\/\/(?:www\.)?([^\/]+)/)) != null)
+			return formatLink(value, m[1]);
+		else
+			return formatLink(value, value);
 
 	case 'owrt_forum_topic_url':
 		if ((m = value.match(/\bviewtopic\.php\?id=(\d+)\b/)) != null)
@@ -179,11 +182,20 @@ function formatValue(colName, value) {
 
 	case 'supportedsincerel':
 	case 'supportedcurrentrel':
-		return formatLink(`/releases/${value}`, value, true);
+		if (value.match(/^(snapshot|[0-9.]+)$/))
+			return formatLink(`/releases/${value}`, value, true);
+		else
+			return document.createTextNode(value ?? '');
 
 	case 'supportedsincecommit':
-		if ((m = value.match(/\bh=([0-9a-f]{8,40})\b/)) != null)
+		if ((m = value.match(/\bh=([0-9a-f]{8,})\b/)) != null || (m = value.match(/^https?:\/\/github\.com\/openwrt\/openwrt\/commit\/([0-9a-f]{8,})\b/)) != null)
 			return document.createElement('code').appendChild(formatLink(value, m[1].substring(0, 12))).parentNode;
+		else if ((m = value.match(/^https?:\/\/github\.com\/([^\/]+\/[^\/]+)\/commit\/([0-9a-f]{8,})\b/)) != null)
+			return formatLink(value, `GitHub: ${m[1]}@${m[2].substring(0, 12)}`);
+		else if ((m = value.match(/^https?:\/\/github\.com\/[^\/]+\/[^\/]+\/pull\/([0-9]+)\b/)) != null)
+			return formatLink(value, `GitHub: PR#${m[1]}`);
+		else if ((m = value.match(/^https?:\/\/github\.com\/([^\/]+\/[^\/]+)\b/)) != null)
+			return formatLink(value, `GitHub: ${m[1]}`);
 		else
 			return formatLink(value, value);
 
