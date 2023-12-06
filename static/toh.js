@@ -131,12 +131,13 @@ function formatLink(url, title, internal) {
 }
 
 function formatValue(colName, value) {
+	let m;
+
 	switch (colName) {
 	case 'oemdevicehomepageurl':
 		return formatLink(value, value);
 
 	case 'owrt_forum_topic_url':
-		let m;
 		if ((m = value.match(/\bviewtopic\.php\?id=(\d+)\b/)) != null)
 			return formatLink(value, `Archive thread #${m[1]}`);
 		else if ((m = value.match(/\bviewtopic\.php\?pid=(\d+)\b/)) != null)
@@ -173,8 +174,26 @@ function formatValue(colName, value) {
 	case 'target':
 		return formatLink(`/docs/techref/targets/${value}`, value, true);
 
+	case 'packagearchitecture':
+		return formatLink(`/docs/techref/instructionset/${value}`, value, true);
+
+	case 'supportedsincerel':
 	case 'supportedcurrentrel':
 		return formatLink(`/releases/${value}`, value, true);
+
+	case 'supportedsincecommit':
+		if ((m = value.match(/\bh=([0-9a-f]{8,40})\b/)) != null)
+			return document.createElement('code').appendChild(formatLink(value, m[1].substring(0, 12))).parentNode;
+		else
+			return formatLink(value, value);
+
+	case 'fccid':
+		if ((m = value.match(/^https?:\/\/(?:fccid|fcc)\.io\/(.+)$/)) != null)
+			return formatLink(value, m[1]);
+		else if ((m = value.match(/^https?:\/\//)) != null)
+			return formatLink(value, value);
+		else
+			return document.createTextNode(value ?? '');
 
 	default:
 		return document.createTextNode(value ?? '');
