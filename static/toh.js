@@ -112,62 +112,69 @@ function loadFullTableData() {
 	}));
 }
 
+function formatLink(url, title, internal) {
+	let a = document.createElement('a');
+
+	a.href = url;
+	a.text = title;
+
+	if (internal) {
+		a.title = url.replace(/^https?:\/\/openwrt\.org\/|^\//, '').replace(/\//g, ':');
+		a.classList.add('wikilink1');
+	}
+	else {
+		a.rel = 'nofollow';
+		a.classList.add('urlextern');
+	}
+
+	return a;
+}
+
 function formatValue(colName, value) {
 	switch (colName) {
 	case 'oemdevicehomepageurl':
+		return formatLink(value, value);
+
+	case 'owrt_forum_topic_url':
+		let m;
+		if ((m = value.match(/\bviewtopic\.php\?id=(\d+)\b/)) != null)
+			return formatLink(value, `Archive thread #${m[1]}`);
+		else if ((m = value.match(/\bviewtopic\.php\?pid=(\d+)\b/)) != null)
+			return formatLink(value, `Archive post #${m[1]}`);
+		else if ((m = value.match(/\/t\/([^\/]{5,})(?:\/\d+\b|$)/)) != null)
+			return formatLink(value, `Discourse: ${m[1]}`);
+		else
+			return formatLink(value, value);
+
+	case 'wikideviurl':
+		return formatLink(value, `WikiDevi: ${value.replace(/^.+\//, '')}`);
+
 	case 'firmwareoemstockurl':
+		return formatLink(value, 'OEM Firmware');
+
 	case 'firmwareopenwrtinstallurl':
+		return formatLink(value, 'Factory image');
+
 	case 'firmwareopenwrtupgradeurl':
+		return formatLink(value, 'Sysupgrade image');
+
 	case 'firmwareopenwrtsnapshotinstallurl':
+		return formatLink(value, 'Factory snapshot image');
+
 	case 'firmwareopenwrtsnapshotupgradeurl':
-		{
-			let a = document.createElement('a');
-			a.classList.add('urlextern');
-			a.rel = 'nofollow';
-			a.href = value;
-			a.text = value;
-			return a;
-		}
+		return formatLink(value, 'Factory sysupgrade image');
 
 	case 'deviceid':
-		{
-			let a = document.createElement('a');
-			a.classList.add('wikilink1');
-			a.title = `toh:hwdata:${value}`;
-			a.href = `/toh/hwdata/${value.replace(/:/g, '/')}`;
-			a.text = 'Edit';
-			return a;
-		}
+		return formatLink(`/toh/hwdata/${value.replace(/:/g, '/')}`, 'Edit', true);
 
 	case 'devicepage':
-		{
-			let a = document.createElement('a');
-			a.classList.add('wikilink1');
-			a.title = value;
-			a.href = `/${value.replace(/:/g, '/')}`;
-			a.text = value.replace(/^.+:/, '');
-			return a;
-		}
+		return formatLink(`/${value.replace(/:/g, '/')}`, value.replace(/^.+/, ''), true);
 
 	case 'target':
-		{
-			let a = document.createElement('a');
-			a.classList.add('wikilink1');
-			a.title = `docs:techref:targets:${value}`;
-			a.href = `/docs/techref/targets/${value}`;
-			a.text = value;
-			return a;
-		}
+		return formatLink(`/docs/techref/targets/${value}`, value, true);
 
 	case 'supportedcurrentrel':
-		{
-			let a = document.createElement('a');
-			a.classList.add('wikilink1');
-			a.title = `releases:${value}`;
-			a.href = `/releases/${value}`;
-			a.text = value;
-			return a;
-		}
+		return formatLink(`/releases/${value}`, value, true);
 
 	default:
 		return document.createTextNode(value ?? '');
