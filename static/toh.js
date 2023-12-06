@@ -350,7 +350,7 @@ function initToH() {
 				});
 
 				let m = location.href.match(new RegExp(`[?&;]toh\\.filter\\.${colName}=([^?&;]+)`));
-				if (m) filterColumns[colName] = m[1];
+				if (m) filterColumns[colName] = decodeURIComponent(m[1]);
 			});
 
 			if (shownColumns.length && !shownColumns.includes('deviceid'))
