@@ -274,25 +274,26 @@ function dataToTable(data, columnOrder, filterColumns, domSetting) {
 		th.style.textOverflow = 'ellipsis';
 		table.firstElementChild.firstElementChild.appendChild(th);
 
-		if (domSetting.indexOf('f') !== -1) {
-			let filter = document.createElement('th');
+		let filter = document.createElement('th');
 
-			switch (data.columns[colSrcIdx]) {
-			case 'deviceid':
-			case 'devicepage':
-				break;
+		switch (data.columns[colSrcIdx]) {
+		case 'deviceid':
+		case 'devicepage':
+			break;
 
-			default:
-				filter.appendChild(document.createElement('input'));
-				filter.firstElementChild.type = 'text';
-				filter.firstElementChild.placeholder = data.captions[colSrcIdx];
-				filter.firstElementChild.style.width = '100%';
-				break;
-			}
-
-			table.firstElementChild.lastElementChild.appendChild(filter);
+		default:
+			filter.appendChild(document.createElement('input'));
+			filter.firstElementChild.type = 'text';
+			filter.firstElementChild.placeholder = data.captions[colSrcIdx];
+			filter.firstElementChild.style.width = '100%';
+			break;
 		}
+
+		table.firstElementChild.lastElementChild.appendChild(filter);
 	});
+
+	if (domSetting.indexOf('f') === -1)
+		table.firstElementChild.removeChild(table.firstElementChild.lastElementChild);
 
 	data.entries.forEach((record, rowIdx) => {
 		for (let i = 0; i < record.length; i++)
@@ -393,9 +394,7 @@ function initToH() {
 				if (m) filterColumns[colName] = decodeURIComponent(m[1]);
 			});
 
-			if (shownColumns.length && !shownColumns.includes('deviceid'))
-				shownColumns.push('deviceid');
-			else if (!shownColumns.length)
+			if (!shownColumns.length)
 				shownColumns = [ ...srcData.columns.filter(k => k != 'deviceid'), 'deviceid' ];
 
 			for (let colName of hiddenColumns)
