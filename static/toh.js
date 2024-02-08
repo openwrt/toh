@@ -231,7 +231,7 @@ function loadJSONTableData() {
 	}));
 }
 
-function dataToTable(data, columnOrder, filterColumns) {
+function dataToTable(data, columnOrder, filterColumns, domSetting) {
 	let table = document.createElement('table');
 	let columnFilter = data.columns.map((k, i) => filterColumns?.[k]).map(f => {
 		if (!f)
@@ -274,22 +274,24 @@ function dataToTable(data, columnOrder, filterColumns) {
 		th.style.textOverflow = 'ellipsis';
 		table.firstElementChild.firstElementChild.appendChild(th);
 
-		let filter = document.createElement('th');
+		if (domSetting.indexOf('f') !== -1) {
+			let filter = document.createElement('th');
 
-		switch (data.columns[colSrcIdx]) {
-		case 'deviceid':
-		case 'devicepage':
-			break;
+			switch (data.columns[colSrcIdx]) {
+			case 'deviceid':
+			case 'devicepage':
+				break;
 
-		default:
-			filter.appendChild(document.createElement('input'));
-			filter.firstElementChild.type = 'text';
-			filter.firstElementChild.placeholder = data.captions[colSrcIdx];
-			filter.firstElementChild.style.width = '100%';
-			break;
+			default:
+				filter.appendChild(document.createElement('input'));
+				filter.firstElementChild.type = 'text';
+				filter.firstElementChild.placeholder = data.captions[colSrcIdx];
+				filter.firstElementChild.style.width = '100%';
+				break;
+			}
+
+			table.firstElementChild.lastElementChild.appendChild(filter);
 		}
-
-		table.firstElementChild.lastElementChild.appendChild(filter);
 	});
 
 	data.entries.forEach((record, rowIdx) => {
@@ -399,12 +401,13 @@ function initToH() {
 			for (let colName of hiddenColumns)
 				shownColumns = shownColumns.filter(k => k != colName);
 
+			const domSetting = profile?.dom ?? 'lfrtip';
 			const columnOrder = shownColumns.map(colName => srcData.columns.indexOf(colName));
-			let table = $(dataToTable(srcData, columnOrder, filterColumns));
+			let table = $(dataToTable(srcData, columnOrder, filterColumns, domSetting));
 
 			$(wrapper).hide().empty().append(table);
 			$(wrapper).find('table').DataTable({
-				dom: profile?.dom ?? 'lfrtip',
+				dom: domSetting,
 				paging: profile?.paging ?? true,
 				pageLength: profile?.pageLength ?? 50,
 				orderCellsTop: true,
