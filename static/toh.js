@@ -231,7 +231,7 @@ function loadJSONTableData() {
 	}));
 }
 
-function dataToTable(data, columnOrder, filterColumns, domSetting) {
+function dataToTable(data, columnOrder, filterColumns, domSetting, rotateTable) {
 	let table = document.createElement('table');
 	let columnFilter = data.columns.map((k, i) => filterColumns?.[k]).map(f => {
 		if (!f)
@@ -258,6 +258,9 @@ function dataToTable(data, columnOrder, filterColumns, domSetting) {
 	table.classList.add('table', 'table-striped', 'table-sm');
 	table.innerHTML = '<thead><tr></tr><tr class="filters"></tr></thead><tbody></tbody>'
 
+	if (rotateTable)
+		table.classList.add('rotate');
+
 	columnOrder.forEach(colSrcIdx => {
 		let th = document.createElement('th');
 
@@ -267,11 +270,15 @@ function dataToTable(data, columnOrder, filterColumns, domSetting) {
 		}
 
 		th.classList.add(`toh_${data.columns[colSrcIdx]}`);
-		th.style.maxWidth = 0;
-		th.style.minWidth = '3em';
-		th.style.whiteSpace = 'nowrap';
-		th.style.overflow = 'hidden';
-		th.style.textOverflow = 'ellipsis';
+
+		if (!rotateTable) {
+			th.style.maxWidth = 0;
+			th.style.minWidth = '3em';
+			th.style.whiteSpace = 'nowrap';
+			th.style.overflow = 'hidden';
+			th.style.textOverflow = 'ellipsis';
+		}
+
 		table.firstElementChild.firstElementChild.appendChild(th);
 
 		let filter = document.createElement('th');
@@ -351,7 +358,7 @@ function initToH() {
 		catch(e) { console.error('Error parsing ToH settings: ' + e); }
 
 		profile ??= {};
-		profile.source ??= 'min';
+		profile.source ??= 'json';
 
 		let loadSource;
 		switch (profile.source) {
@@ -402,7 +409,8 @@ function initToH() {
 
 			const domSetting = profile?.dom ?? 'lfrtip';
 			const columnOrder = shownColumns.map(colName => srcData.columns.indexOf(colName));
-			let table = $(dataToTable(srcData, columnOrder, filterColumns, domSetting));
+			const rotateTable = profile?.rotate ?? false;
+			let table = $(dataToTable(srcData, columnOrder, filterColumns, domSetting, rotateTable));
 
 			$(wrapper).hide().empty().append(table);
 			$(wrapper).find('table').DataTable({
